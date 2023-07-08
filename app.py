@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import streamlit as st
 import plotly.express as px
 
+# TODO: switch to env variables for deployment
 # from google_service_account import GOOGLE_SERVICE_ACCOUNT_CREDENTIALS
 
 pd.set_option('display.max_columns', None)
@@ -35,6 +36,8 @@ main_df = pd.DataFrame(data_worksheet.get_all_records())
 main_df["start_date_local"] = pd.to_datetime(main_df["start_date_local"])
 main_df["start_date_year"] = pd.DatetimeIndex(main_df["start_date_local"]).year
 main_df["start_date_month"] = pd.DatetimeIndex(main_df["start_date_local"]).month
+main_df["start_date_day"] = pd.DatetimeIndex(main_df["start_date_local"]).day
+main_df["start_date_day_month"] = pd.to_datetime(main_df["start_date_local"].dt.strftime('%d-%m'), format='%d-%m')
 main_df["start_date_month_name"] = main_df['start_date_local'].dt.month_name()
 main_df['start_date_week_number'] = main_df['start_date_local'].dt.isocalendar().week
 main_df.loc[
@@ -66,21 +69,31 @@ main_df = main_df.astype({
     'elev_low': 'Int64',
 })
 
+running_df = main_df[main_df["sport_type"] == "Run"]
+running_df['cumulative_distance'] = running_df.groupby(running_df['start_date_local'].dt.year)['distance'].cumsum()
+
 # Reduce to 2022 only for analysis
-this_year = datetime.now().year
-main_df = main_df.loc[main_df["start_date_year"] == this_year]
+cur_year = datetime.now().year
+cur_year_df = main_df[main_df["start_date_year"] == cur_year]
 
 # --- Global analysis ---
-total_activities = main_df.shape[0]
-total_active_days = main_df.groupby(main_df["start_date_local"].dt.date).count().shape[0]
-total_calories = main_df["calories"].sum()
-total_time = round(main_df["moving_time"].sum() / 60)
-total_time_per_month = main_df.groupby(["start_date_month", "start_date_month_name"]).sum('numeric_only')
+total_activities = cur_year_df.shape[0]
+total_active_days = cur_year_df.groupby(cur_year_df["start_date_local"].dt.date).count().shape[0]
+total_calories = cur_year_df["calories"].sum()
+total_time = round(cur_year_df["moving_time"].sum() / 60)
+total_time_per_month = cur_year_df.groupby(["start_date_month", "start_date_month_name"]).sum('numeric_only')
 total_time_per_month["moving_time"] = round(total_time_per_month["moving_time"] / 60)
-total_time_per_sport_type = main_df.groupby(["start_date_month", "start_date_month_name", "sport_type"]).sum('numeric_only')
+total_time_per_sport_type = cur_year_df.groupby(["start_date_month", "start_date_month_name", "sport_type"]).sum('numeric_only')
 total_time_per_sport_type["moving_time"] = round(total_time_per_sport_type["moving_time"] / 60)
 months = total_time_per_sport_type.index.get_level_values('start_date_month_name').tolist()[::2]
 
+print(f'2022 GLOBAL:',
+      f'Total activities: {total_activities}',
+      f'Total days active: {total_active_days}',
+      f'Total calories: {total_calories:,}',
+      f'Total time: {total_time} hours\n',
+      # f"Activities performed this year: {', '.join(activities_performed_this_year)}",
+      sep='\n')
 
 # plt.figure(figsize=(14, 8))
 # plt.xticks(fontsize=14, rotation=45)
@@ -91,13 +104,6 @@ months = total_time_per_sport_type.index.get_level_values('start_date_month_name
 # ax1.bar(months, total_time_per_sport_type.loc[total_time_per_sport_type["sport_type"] == "Run"]["moving_time"], color='y')
 # plt.show()
 
-print(f'2022 GLOBAL:',
-      f'Total activities: {total_activities}',
-      f'Total days active: {total_active_days}',
-      f'Total calories: {total_calories:,}',
-      f'Total time: {total_time} hours\n',
-      # f"Activities performed this year: {', '.join(activities_performed_this_year)}",
-      sep='\n')
 
 # print(total_time_per_sport_type["moving_time"])
 # plt.figure(figsize=(14, 8))
@@ -111,13 +117,14 @@ print(f'2022 GLOBAL:',
 
 
 # --- Running analysis ---
-running_df = main_df.loc[main_df["sport_type"] == "Run"]
-total_running_distance = round(running_df["distance"].sum(), 2)
-max_running_distance = running_df["distance"].max()
-total_running_days = running_df.groupby(main_df["start_date_local"].dt.date).count().shape[0]
-total_running_time = round(running_df["moving_time"].sum() / 60)
-total_running_calories = running_df["calories"].sum()
-total_running_elevation = running_df["total_elevation_gain"].sum()
+cur_year_running_df = cur_year_df[cur_year_df["sport_type"] == "Run"]
+
+total_running_distance = round(cur_year_running_df["distance"].sum(), 2)
+max_running_distance = cur_year_running_df["distance"].max()
+total_running_days = cur_year_running_df.groupby(cur_year_df["start_date_local"].dt.date).count().shape[0]
+total_running_time = round(cur_year_running_df["moving_time"].sum() / 60)
+total_running_calories = cur_year_running_df["calories"].sum()
+total_running_elevation = cur_year_running_df["total_elevation_gain"].sum()
 print(f"2022 RUNNING:",
       f"Total running distance: {total_running_distance} kms",
       f"Max distance: {max_running_distance} kms",
@@ -127,49 +134,50 @@ print(f"2022 RUNNING:",
       f"Total running elevation: {total_running_elevation:,} m",
       sep='\n')
 
-total_running_distance_per_month = running_df.groupby(["start_date_month", "start_date_month_name"]).sum('numeric_only')
+total_running_distance_per_month = cur_year_running_df.groupby(["start_date_month", "start_date_month_name"]).sum('numeric_only')
 total_running_distance_per_month["Month"] = total_running_distance_per_month.index.get_level_values("start_date_month_name")
 
-total_running_distance_per_week = running_df.groupby(["start_date_week_number"]).sum('numeric_only')
+total_running_distance_per_week = cur_year_running_df.groupby(["start_date_week_number"]).sum('numeric_only')
 total_running_distance_per_week["Week number"] = total_running_distance_per_week.index.get_level_values("start_date_week_number")
 
 # Distance per month
-plt.figure(figsize=(14, 10))
-plt.xticks(fontsize=14, rotation=45)
-plt.yticks(fontsize=14)
-ax1 = plt.gca()
-ax1.set_xlabel("Month")
-ax1.set_ylabel("Distance", fontsize=12, color='b')
-ax1.bar(
-    total_running_distance_per_month.index.get_level_values('start_date_month_name'),
-    total_running_distance_per_month["distance"],
-    color='b')
-plt.show()
+# plt.figure(figsize=(14, 10))
+# plt.xticks(fontsize=14, rotation=45)
+# plt.yticks(fontsize=14)
+# ax1 = plt.gca()
+# ax1.set_xlabel("Month")
+# ax1.set_ylabel("Distance", fontsize=12, color='b')
+# ax1.bar(
+#     total_running_distance_per_month.index.get_level_values('start_date_month_name'),
+#     total_running_distance_per_month["distance"],
+#     color='b')
+# plt.show()
 
 # Distance per week
-plt.figure(figsize=(14, 10))
-plt.xticks(fontsize=14)
-plt.yticks(fontsize=14)
-ax2 = plt.gca()
-ax2.set_xlabel("Week")
-ax2.set_ylabel("Distance", fontsize=12, color='b')
-ax2.bar(
-    total_running_distance_per_week.index,
-    total_running_distance_per_week["distance"],
-    color='g')
-plt.show()
+# plt.figure(figsize=(14, 10))
+# plt.xticks(fontsize=14)
+# plt.yticks(fontsize=14)
+# ax2 = plt.gca()
+# ax2.set_xlabel("Week")
+# ax2.set_ylabel("Distance", fontsize=12, color='b')
+# ax2.bar(
+#     total_running_distance_per_week.index,
+#     total_running_distance_per_week["distance"],
+#     color='g')
+# plt.show()
 
 
 # ---- Streamlit page ----
-st.set_page_config(page_title=f"{this_year} Year in Review", page_icon=":runner:", layout="wide")
-# uploaded_file = st.file_uploader("Choose a CSV file")
-# st.button("Upload file to Sandbox")
-# ---- MAIN PAGE ----
-st.title(f":runner: {this_year} Year In Review")
+st.set_page_config(page_title=f"{cur_year} Year in Review", page_icon=":runner:", layout="wide")
+
+st.title(f":runner: {cur_year} Year In Review")
+st.markdown("This dashboard is refreshed everyday using my [Strava](https://www.strava.com/athletes/20432049) data and the [Strava API](https://developers.strava.com/).")
 st.markdown("---")
 # st.markdown("##")
+# st.dataframe(main_df)
+# st.line_chart(running_df["distance"])
 
-st.header("Global")
+st.header(f"{cur_year} Global")
 left_column, middle_column, right_column = st.columns(3)
 with left_column:
     st.text("Total Active Days:")
@@ -179,6 +187,9 @@ with left_column:
 with middle_column:
     st.text("Total Time:")
     st.subheader(f"{total_time} hours")
+    st.text("Latest activity:")
+    st.subheader(cur_year_df["start_date_local"].iloc[-1].strftime("%B %d, %Y")
+                 )
 with right_column:
     st.text("Total Activities:")
     st.subheader(f"{total_activities}")
@@ -230,7 +241,6 @@ distance_per_month_fig = px.bar(
     x=total_running_distance_per_month["Month"],
     y=total_running_distance_per_month['distance'],
     orientation="v",
-    title="Running Distance per Month",
     template="plotly_white",
 )
 
@@ -243,6 +253,7 @@ distance_per_month_fig.update_layout(
     height=600
 )
 
+st.markdown('### Running Distance per Month:')
 st.plotly_chart(distance_per_month_fig, use_container_width=True)
 
 # Distance per week
@@ -251,7 +262,6 @@ distance_per_week_fig = px.bar(
     x=total_running_distance_per_week["Week number"],
     y=total_running_distance_per_week['distance'],
     orientation="v",
-    title="Running Distance per Week",
     template="plotly_white",
 )
 
@@ -263,6 +273,18 @@ distance_per_week_fig.update_layout(
     yaxis_title="Distance [kms]",
     height=600
 )
-
+st.markdown('### Running Distance per Week:')
 st.plotly_chart(distance_per_week_fig, use_container_width=True)
 
+# Cumulative running
+st.markdown('### Cumulative Running Distance, Year Over Year:')
+cumulative_running = px.line()
+cumulative_running.add_scatter(x=running_df[running_df["start_date_year"] == cur_year]['start_date_day_month'], y=running_df[running_df["start_date_year"] == cur_year]['cumulative_distance'], name=cur_year, mode='lines')
+cumulative_running.add_scatter(x=running_df[running_df["start_date_year"] == cur_year - 1]['start_date_day_month'], y=running_df[running_df["start_date_year"] == cur_year - 1]['cumulative_distance'], name=cur_year - 1, mode='lines')
+cumulative_running.add_scatter(x=running_df[running_df["start_date_year"] == cur_year - 2]['start_date_day_month'], y=running_df[running_df["start_date_year"] == cur_year - 2]['cumulative_distance'], name=cur_year - 2, mode='lines')
+cumulative_running.update_xaxes(title_text='Date', dtick='M1', tickformat='%d-%b')
+cumulative_running.update_yaxes(title_text='Distance [kms]', dtick=200)
+cumulative_running.update_layout(height=600)
+st.plotly_chart(cumulative_running, use_container_width=True)
+
+# st.dataframe(running_df)
