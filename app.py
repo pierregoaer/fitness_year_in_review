@@ -27,6 +27,7 @@ GOOGLE_SERVICE_ACCOUNT_CREDENTIALS = {
     "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
     "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/personal-strava-export-api%40personal-strava-export-api.iam.gserviceaccount.com"
 }
+
 service_acc = gspread.service_account_from_dict(GOOGLE_SERVICE_ACCOUNT_CREDENTIALS)
 gsheet_file = service_acc.open("personal_strava_export_api")
 data_worksheet = gsheet_file.worksheet("data")
