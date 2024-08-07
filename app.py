@@ -36,10 +36,11 @@ main_df = pd.DataFrame(data_worksheet.get_all_records())
 
 # --- Clean up dataframe ---
 main_df["start_date_local"] = pd.to_datetime(main_df["start_date_local"])
+main_df["start_date_day_only"] = main_df["start_date_local"].dt.normalize()
 main_df["start_date_year"] = pd.DatetimeIndex(main_df["start_date_local"]).year
 main_df["start_date_month"] = pd.DatetimeIndex(main_df["start_date_local"]).month
 main_df["start_date_day"] = pd.DatetimeIndex(main_df["start_date_local"]).day
-main_df["start_date_day_month"] = pd.to_datetime(main_df["start_date_local"].dt.strftime('%d-%m'), format='%d-%m')
+main_df["start_date_day_month"] = pd.to_datetime(main_df["start_date_local"].dt.strftime('%m-%d'), format='%m-%d', errors='coerce')
 main_df["start_date_month_name"] = main_df['start_date_local'].dt.month_name()
 main_df['start_date_week_number'] = main_df['start_date_local'].dt.isocalendar().week
 main_df.loc[
@@ -58,6 +59,7 @@ main_df.loc[(main_df['elev_high'] == ""), 'elev_high'] = 0
 main_df.loc[(main_df['elev_low'] == ""), 'elev_low'] = 0
 
 main_df = main_df.astype({
+    'id': 'string',
     'average_heartrate': 'Int64',
     'max_heartrate': 'Int64',
     'average_cadence': 'Int64',
@@ -72,6 +74,7 @@ main_df = main_df.astype({
 })
 
 running_df = main_df[main_df["sport_type"] == "Run"]
+running_df['daily_distance_total'] = running_df.groupby(running_df['start_date_day_only'])['distance'].sum()
 running_df['cumulative_distance'] = running_df.groupby(running_df['start_date_local'].dt.year)['distance'].cumsum()
 
 
@@ -132,6 +135,7 @@ total_time_per_sport_type["moving_time"] = round(total_time_per_sport_type["movi
 months = total_time_per_sport_type.index.get_level_values('start_date_month_name').tolist()[::2]
 
 # --- Streamlit global section ---
+# st.dataframe(running_df[['daily_distance_total', 'cumulative_distance', 'start_date_day_only', 'start_date_day', 'start_date_year', 'start_date_day_month']])
 st.markdown(f"## {cur_year} Global")
 st.markdown('*Numbers compared to the same day last year.*')
 st.markdown("##")
@@ -144,7 +148,8 @@ with left_column:
     st.markdown("---")
     st.markdown("##### Total Calories:")
     st.markdown(f"## {cur_year_total_calories:,} calories")
-    st.markdown(f'*{diff_total_calories} compared to {prev_year} ({prev_year_total_calories} calories)*')
+    st.markdown(f'*{diff_total_calories} compared to {prev_year} ({prev_year_total_calories:,} calories)*')
+    st.markdown("---")
 with middle_column:
     st.markdown("##### Total Time:")
     st.markdown(f"## {cur_year_total_time} hours")
@@ -153,6 +158,7 @@ with middle_column:
     st.markdown("##### Latest activity:")
     st.markdown(f'## {cur_year_df["start_date_local"].iloc[-1].strftime("%B %d, %Y")}')
     st.markdown(f'*As of yesterday*')
+    st.markdown("---")
 with right_column:
     st.markdown("##### Total Activities:")
     st.markdown(f"## {cur_year_total_activities}")
@@ -266,6 +272,7 @@ with left_column:
     st.markdown("##### Total Running Elevation:")
     st.markdown(f"## {cur_year_total_running_elevation:,} m")
     st.markdown(f'*{diff_total_running_elevation} compared to {prev_year} ({prev_year_total_running_elevation:,} m)*')
+    st.markdown("---")
 
 with middle_column:
     st.markdown("##### Total Running Distance:")
@@ -275,6 +282,7 @@ with middle_column:
     st.markdown("##### Total Running Calories:")
     st.markdown(f"## {cur_year_total_running_calories:,}")
     st.markdown(f'*{diff_total_running_calories} compared to {prev_year} ({prev_year_total_running_calories:,} calories)*')
+    st.markdown("---")
 
 with right_column:
     st.markdown("##### Total Running Time:")
@@ -284,6 +292,7 @@ with right_column:
     st.markdown("##### Max Running Distance:")
     st.markdown(f"## {cur_year_max_running_distance} kms")
     st.markdown(f'*{diff_max_running_distance} compared to {prev_year} ({prev_year_max_running_distance} kms)*')
+    st.markdown("---")
 
 # Distance per month graphs
 running_distance_per_month_fig = go.Figure()
@@ -359,7 +368,7 @@ st.plotly_chart(running_distance_per_week_fig, use_container_width=True, height=
 
 # Cumulative running
 st.markdown('### Cumulative Running Distance, Year Over Year:')
-cumulative_running = px.line()
+cumulative_running = px.line(line_shape='spline')
 cumulative_running.add_scatter(x=running_df[running_df["start_date_year"] == cur_year]['start_date_day_month'],
                                y=running_df[running_df["start_date_year"] == cur_year]['cumulative_distance'],
                                name=cur_year, mode='lines')
