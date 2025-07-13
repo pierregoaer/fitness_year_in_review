@@ -103,6 +103,24 @@ st.markdown("---")
 # st.dataframe(main_df)
 
 # --- Global analysis ---
+total_activities = main_df.shape[0]
+total_time = round(main_df["moving_time"].sum() / 60)
+total_distance = round(main_df[main_df["sport_type"] == "Run"]["distance"].sum())
+
+st.markdown(f"## Global Numbers")
+left_column, middle_column, right_column = st.columns(3)
+with left_column:
+    st.markdown("##### Total Activities:")
+    st.markdown(f"## {total_activities:,}")
+with middle_column:
+    st.markdown("##### Total Time:")
+    st.markdown(f"## {total_time:,} hours")
+with right_column:
+    st.markdown("##### Total Distance:")
+    st.markdown(f"## {total_distance:,} kms")
+st.markdown("---")
+
+# --- Current vs previous year analysis ---
 # --- total activities ---
 cur_year_total_activities = cur_year_df.shape[0]
 prev_year_total_activities = prev_year_df[prev_year_df['start_date_local'] < one_year_ago].shape[0]
@@ -137,7 +155,7 @@ months = total_time_per_sport_type.index.get_level_values('start_date_month_name
 
 # --- Streamlit global section ---
 # st.dataframe(running_df[['daily_distance_total', 'cumulative_distance', 'start_date_day_only', 'start_date_day', 'start_date_year', 'start_date_day_month']])
-st.markdown(f"## {cur_year} Global")
+st.markdown(f"## {cur_year} Only")
 st.markdown('*Numbers compared to the same day last year.*')
 st.markdown("##")
 
